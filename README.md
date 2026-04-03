@@ -103,6 +103,25 @@ anthropic/claude-opus-4-6
 "model": "mlx-community/gemma-4-26b-a4b-it-4bit"
 ```
 
+## Hermes Integration (Fallback)
+
+Hermes is configured to fail over to this same local Gemma 4 endpoint when its primary model provider fails.
+
+`~/.hermes/config.yaml`:
+
+```yaml
+fallback_model:
+  provider: custom
+  model: mlx-community/gemma-4-26b-a4b-it-4bit
+  base_url: http://127.0.0.1:8890/v1
+  api_key_env: OPENAI_API_KEY
+```
+
+Notes:
+- Hermes primary can stay cloud (e.g. `openai-codex/gpt-5.3-codex`)
+- On provider failure, Hermes switches to local Gemma 4 and continues the turn
+- Full model ID is required in requests (`mlx-community/gemma-4-26b-a4b-it-4bit`)
+
 ## Testing
 
 ```bash
