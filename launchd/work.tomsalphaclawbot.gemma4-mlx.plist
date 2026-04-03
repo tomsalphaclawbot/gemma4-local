@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Gemma 4 26B MoE — mlx-vlm HTTP server
+  Label:    work.tomsalphaclawbot.gemma4-mlx
+  Endpoint: http://127.0.0.1:8890/v1/chat/completions
+
+  Install:  ./launchd/install.sh
+  Uninstall: ./launchd/install.sh - -uninstall
+
+  Edit PROJECT_DIR below to match your clone location before installing.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>work.tomsalphaclawbot.gemma4-mlx</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Edit this path to match your venv location -->
+        <string>/Users/openclaw/.openclaw/workspace/.venvs/gemma4-mlx/bin/python</string>
+        <string>-m</string>
+        <string>mlx_vlm</string>
+        <string>server</string>
+        <string>--model</string>
+        <string>mlx-community/gemma-4-26b-a4b-it-4bit</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>8890</string>
+        <string>--kv-bits</string>
+        <string>3</string>
+        <string>--kv-quant-scheme</string>
+        <string>turboquant</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/openclaw</string>
+        <!-- Edit HF_HOME if your HuggingFace cache is elsewhere -->
+        <key>HF_HOME</key>
+        <string>/Users/openclaw/.cache/huggingface</string>
+    </dict>
+
+    <!-- Edit WorkingDirectory to match your project clone path -->
+    <key>WorkingDirectory</key>
+    <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local</string>
+
+    <!-- Logs go into the project's state/ dir -->
+    <key>StandardOutPath</key>
+    <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local/state/gemma4-server.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local/state/gemma4-server.log</string>
+
+    <!-- Start automatically at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart on crash (not on clean exit) -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Throttle restarts to avoid thrashing -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>
