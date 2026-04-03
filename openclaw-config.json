@@ -1,0 +1,40 @@
+{
+  "_comment": "Paste this provider block into ~/.openclaw/openclaw.json under models.providers",
+  "_instructions": [
+    "1. Add the provider block below to models.providers in your openclaw.json",
+    "2. Add the fallback to agents.defaults.model.fallbacks",
+    "3. Add the alias to agents.defaults.models",
+    "4. Run: openclaw gateway restart"
+  ],
+
+  "provider_block": {
+    "gemma4-mlx": {
+      "baseUrl": "http://127.0.0.1:8890/v1",
+      "apiKey": "none",
+      "api": "openai-responses",
+      "models": [
+        {
+          "id": "mlx-community/gemma-4-26b-a4b-it-4bit",
+          "name": "Gemma 4 26B MoE (local MLX + TurboQuant)",
+          "input": ["text"],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 131072,
+          "maxTokens": 8192
+        }
+      ]
+    }
+  },
+
+  "fallback_entry": "gemma4-mlx/mlx-community/gemma-4-26b-a4b-it-4bit",
+
+  "alias_entry": {
+    "gemma4-mlx/mlx-community/gemma-4-26b-a4b-it-4bit": {
+      "alias": "gemma4"
+    }
+  }
+}
