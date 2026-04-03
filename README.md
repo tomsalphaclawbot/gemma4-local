@@ -151,6 +151,28 @@ mlx-vlm v0.4.3 includes TurboQuant natively (PR #858, #894). The server runs wit
 - Thinks via `<|channel>thought</channel>` (activated automatically)
 - LMArena: 26B MoE = 1441, 31B dense = 1452
 
+## Credits & Upstream Resources
+
+This project is glue code on top of excellent upstream work:
+
+| Project | What it does | Link |
+|---|---|---|
+| **Gemma 4** | The model family — 26B MoE, Apache 2.0 | [Google DeepMind](https://deepmind.google/models/gemma/gemma-4/) · [HuggingFace](https://huggingface.co/google/gemma-4-27b-it) |
+| **MLX** | Apple Silicon ML framework powering inference | [github.com/ml-explore/mlx](https://github.com/ml-explore/mlx) |
+| **mlx-vlm** | VLM inference + server on MLX; includes TurboQuant natively (v0.4.3+) | [github.com/Blaizzy/mlx-vlm](https://github.com/Blaizzy/mlx-vlm) |
+| **TurboQuant+** | KV cache compression via PolarQuant + Walsh-Hadamard rotation (4.6–6.4x) | [github.com/TheTom/turboquant_plus](https://github.com/TheTom/turboquant_plus) |
+| **mlx-community** | Pre-quantized MLX model weights on HuggingFace | [huggingface.co/mlx-community](https://huggingface.co/mlx-community) |
+| **OpenClaw** | AI agent runtime this service integrates into | [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw) |
+
+### Key people
+
+- **Blaizzy** ([@prince_canuma](https://x.com/prince_canuma)) — mlx-vlm maintainer, shipped day-0 Gemma 4 support and native TurboQuant integration
+- **Tom Turney** ([@no_stp_on_snek](https://x.com/no_stp_on_snek)) — TurboQuant+ author, KV cache + weight compression for local inference
+- **Google DeepMind** — Gemma 4 model release (Apache 2.0)
+- **Apple MLX team** — MLX framework making this feasible on Apple Silicon
+
+---
+
 ## Running Other Models (CLI)
 
 For one-off inference with any downloaded model:
