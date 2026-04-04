@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>work.tomsalphaclawbot.gemma4-proxy</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local/gemma4-proxy.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local/state/gemma4-proxy.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/openclaw/.openclaw/workspace/projects/gemma4-local/state/gemma4-proxy.log</string>
+</dict>
+</plist>

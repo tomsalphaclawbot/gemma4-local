@@ -2,6 +2,7 @@
 # gemma4-server.sh — Start Gemma 4 26B MoE via mlx-vlm HTTP server
 # OpenAI-compatible endpoint at http://127.0.0.1:8890
 # TurboQuant KV-3 compression, ~15.5GB peak RAM
+# Context capped at 16k tokens (--max-kv-size) to keep prefill times manageable
 #
 # Usage:
 #   ./gemma4-server.sh            # start in background
@@ -21,9 +22,10 @@ PID_FILE="$PROJECT_DIR/state/gemma4-server.pid"
 LOG_FILE="$PROJECT_DIR/state/gemma4-server.log"
 
 # MLX wired memory cap in MB — limits GPU wired memory so Docker and other
-# services can coexist on 32GB. 20480 = 20GB for MLX, ~12GB for everything else.
-# Requires: sudo sysctl iogpu.wired_limit_mb=20480 (or set in /etc/sysctl.conf)
-MLX_WIRED_LIMIT_MB=${MLX_WIRED_LIMIT_MB:-20480}
+# services can coexist on 32GB. 16384 = 16GB for MLX, ~16GB for everything else.
+# Previous 20GB cap caused OOM kills on OpenClaw gateway under concurrent load.
+# Requires: sudo sysctl iogpu.wired_limit_mb=16384 (or set in /etc/sysctl.conf)
+MLX_WIRED_LIMIT_MB=${MLX_WIRED_LIMIT_MB:-16384}
 
 # Minimum free RAM (GB) required before starting
 MIN_FREE_GB=${MIN_FREE_GB:-6}
@@ -94,7 +96,8 @@ case "${1:-}" in
       --host "$HOST" \
       --port "$PORT" \
       --kv-bits 3 \
-      --kv-quant-scheme turboquant
+      --kv-quant-scheme turboquant \
+      --max-kv-size 16384
     ;;
 
   *)
@@ -132,6 +135,7 @@ if mx.metal.is_available():
       --port "$PORT" \
       --kv-bits 3 \
       --kv-quant-scheme turboquant \
+      --max-kv-size 16384 \
       >> "$LOG_FILE" 2>&1 &
 
     PID=$!
