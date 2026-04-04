@@ -64,6 +64,19 @@ All cached in `~/.cache/huggingface/hub/` (~34GB total).
 - Technical Debt: Auth system debt to be addressed over 3 weeks, delaying feature X by 2 weeks
 - Design Decision: Onboarding design B approved (34% better completion), assets due Wednesday
 
+## Switching Models
+
+Only one model runs at a time — 32GB RAM is enough for one, not both. See **[MODEL-SELECTION.md](MODEL-SELECTION.md)** for the full decision guide.
+
+```bash
+./swap-model.sh status   # what's running
+./swap-model.sh 26b      # switch to 26B MoE (default — quality)
+./swap-model.sh e4b      # switch to E4B (fast — 6GB RAM, 1.75s load)
+./swap-model.sh stop     # stop server, free memory
+```
+
+**TL;DR:** Run 26B for quality work. Swap to E4B for batch/high-volume jobs or when you need the RAM for something else.
+
 ## Venv
 
 ```
