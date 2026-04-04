@@ -1,0 +1,174 @@
+[
+  {
+    "model_id": "mlx-community/gemma-4-e4b-it-4bit",
+    "model_label": "Gemma 4 E4B (4.5B, 4-bit)",
+    "load_time_s": 1.75,
+    "tasks": [
+      {
+        "name": "short_qa",
+        "label": "Short Q&A",
+        "prompt_tokens": 21,
+        "generation_tokens": 2,
+        "prompt_tps": 137.2,
+        "generation_tps": 66.6,
+        "total_time_s": 0.23,
+        "peak_memory_gb": 5.265,
+        "output": "Paris"
+      },
+      {
+        "name": "reasoning",
+        "label": "Reasoning",
+        "prompt_tokens": 42,
+        "generation_tokens": 80,
+        "prompt_tps": 172.1,
+        "generation_tps": 34.0,
+        "total_time_s": 2.62,
+        "peak_memory_gb": 5.302,
+        "output": "Here's the solution:\n\n**The ball costs $0.05 (or 5 cents).**\n\n**Reasoning:**\n\n1. **Think about the base price:** If the ball cost $\\$0.05$, and the bat costs $\\$1.05$ more than the ball, the total would be $\\$0.05 + \\$1.05 = \\$"
+      },
+      {
+        "name": "code_gen",
+        "label": "Code Generation",
+        "prompt_tokens": 29,
+        "generation_tokens": 90,
+        "prompt_tps": 161.4,
+        "generation_tps": 34.0,
+        "total_time_s": 2.85,
+        "peak_memory_gb": 5.302,
+        "output": "```python\ndef fibonacci(n, memo={}):\n    if n in memo:\n        return memo[n]\n    if n <= 0:\n        return 0\n    if n == 1:\n        return 1\n    memo[n] = fibonacci(n - 1, memo) + fibonacci(n - 2, memo)\n    return memo[n]\n```"
+      },
+      {
+        "name": "medium_context",
+        "label": "Medium Context (2K tokens)",
+        "prompt_tokens": 3029,
+        "generation_tokens": 33,
+        "prompt_tps": 544.4,
+        "generation_tps": 33.9,
+        "total_time_s": 6.57,
+        "peak_memory_gb": 6.075,
+        "output": "Episodic memory stores specific events with their temporal and spatial context, semantic memory stores general facts and concepts, and working memory holds information temporarily for immediate use."
+      },
+      {
+        "name": "long_context",
+        "label": "Long Context (8K tokens)",
+        "prompt_tokens": 12428,
+        "generation_tokens": 60,
+        "prompt_tps": 516.1,
+        "generation_tps": 30.6,
+        "total_time_s": 26.07,
+        "peak_memory_gb": 6.759,
+        "output": "The core problem is that current LLM memory architectures are entirely \"cortex\" and lack a hippocampal equivalent. This forces agents to undergo a reconstruction process\u2014involving writing, summarizing, and rebuilding\u2014for every experience, leading to a loss of fine-grained texture and reasoning quali"
+      },
+      {
+        "name": "summarization",
+        "label": "Summarization",
+        "prompt_tokens": 177,
+        "generation_tokens": 120,
+        "prompt_tps": 259.1,
+        "generation_tps": 33.9,
+        "total_time_s": 4.24,
+        "peak_memory_gb": 6.759,
+        "output": "Here are the three bullet points summarizing the meeting notes:\n\n* **Strong Q4 Performance Reviewed:** The team noted positive metrics, including a 23% increase in DAU, 18% revenue growth, and a 4-point decrease in churn.\n* **Technical Debt Prioritized:** Due to security risks, the team agreed to de"
+      },
+      {
+        "name": "instruction_follow",
+        "label": "Instruction Following",
+        "prompt_tokens": 29,
+        "generation_tokens": 11,
+        "prompt_tps": 202.0,
+        "generation_tps": 35.9,
+        "total_time_s": 0.47,
+        "peak_memory_gb": 6.759,
+        "output": "C++\nGo\nJava\nPython\nRuby"
+      }
+    ],
+    "mlx_vlm_version": "0.4.4",
+    "timestamp": "2026-04-04T18:43:34.565410"
+  },
+  {
+    "model_id": "mlx-community/gemma-4-26b-a4b-it-4bit",
+    "model_label": "Gemma 4 26B-A4B (MoE, 4-bit)",
+    "load_time_s": 10.84,
+    "tasks": [
+      {
+        "name": "short_qa",
+        "label": "Short Q&A",
+        "prompt_tokens": 25,
+        "generation_tokens": 2,
+        "prompt_tps": 79.6,
+        "generation_tps": 22.6,
+        "total_time_s": 5.99,
+        "peak_memory_gb": 15.696,
+        "output": "Paris"
+      },
+      {
+        "name": "reasoning",
+        "label": "Reasoning",
+        "prompt_tokens": 46,
+        "generation_tokens": 80,
+        "prompt_tps": 112.0,
+        "generation_tps": 35.3,
+        "total_time_s": 2.68,
+        "peak_memory_gb": 15.696,
+        "output": "The ball costs **$0.05** (5 cents).\n\n**Reasoning:**\n1. Let the cost of the ball be $x$.\n2. The bat costs $x + \\$1.00$.\n3. Together, they cost: $x + (x + \\$1.00) = \\$1.10$.\n4. Simplify: $"
+      },
+      {
+        "name": "code_gen",
+        "label": "Code Generation",
+        "prompt_tokens": 33,
+        "generation_tokens": 88,
+        "prompt_tps": 101.6,
+        "generation_tps": 35.3,
+        "total_time_s": 2.83,
+        "peak_memory_gb": 15.696,
+        "output": "```python\ndef get_nth_fibonacci(n, memo={0: 0, 1: 1}):\n    if n in memo:\n        return memo[n]\n    \n    memo[n] = get_nth_fibonacci(n - 1, memo) + get_nth_fibonacci(n - 2, memo)\n    return memo[n]\n```"
+      },
+      {
+        "name": "medium_context",
+        "label": "Medium Context (2K tokens)",
+        "prompt_tokens": 3033,
+        "generation_tokens": 42,
+        "prompt_tps": 336.6,
+        "generation_tps": 32.8,
+        "total_time_s": 10.31,
+        "peak_memory_gb": 16.868,
+        "output": "1. The episodic memory system stores specific events with their temporal and spatial context.\n2. The semantic memory system stores general facts and concepts.\n3. Working memory holds information temporarily for immediate use."
+      },
+      {
+        "name": "long_context",
+        "label": "Long Context (8K tokens)",
+        "prompt_tokens": 12432,
+        "generation_tokens": 60,
+        "prompt_tps": 300.3,
+        "generation_tps": 29.1,
+        "total_time_s": 43.49,
+        "peak_memory_gb": 17.974,
+        "output": "Current LLM memory architectures suffer from the \"reconstruction problem,\" where information is lost during the repetitive cycles of writing, summarization, and rebuilding. This occurs because current systems focus entirely on semantic consolidation (cortex) while lacking a mechanism for episodic me"
+      },
+      {
+        "name": "summarization",
+        "label": "Summarization",
+        "prompt_tokens": 181,
+        "generation_tokens": 120,
+        "prompt_tps": 226.8,
+        "generation_tps": 34.9,
+        "total_time_s": 4.25,
+        "peak_memory_gb": 17.974,
+        "output": "Here is a summary of the Q1 Planning Session:\n\n* **Performance Review:** Q4 saw positive growth with DAU up 23%, revenue up 18%, and a 4-point decrease in churn.\n* **Key Decisions:** To mitigate security risks, Feature X will be delayed by two weeks to prioritize addressing technical debt in the aut"
+      },
+      {
+        "name": "instruction_follow",
+        "label": "Instruction Following",
+        "prompt_tokens": 33,
+        "generation_tokens": 11,
+        "prompt_tps": 99.1,
+        "generation_tps": 38.7,
+        "total_time_s": 0.63,
+        "peak_memory_gb": 17.974,
+        "output": "C++\nJava\nPython\nRust\nSwift"
+      }
+    ],
+    "mlx_vlm_version": "0.4.4",
+    "timestamp": "2026-04-04T18:44:28.525907"
+  }
+]

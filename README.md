@@ -17,39 +17,88 @@ OpenClaw gateway
                           └── TurboQuant KV-3 compression
 ```
 
-## Models Downloaded
+## Models
 
-All cached in `~/.cache/huggingface/hub/` (~29GB total).
+All cached in `~/.cache/huggingface/hub/` (~34GB total).
 
-| Model | Quant | Peak RAM | CLI speed | Server speed |
+| Model | Quant | Peak RAM | Load time | Notes |
 |---|---|---|---|---|
-| gemma-4-e4b-it-8bit | 8bit | ~9 GB | ~7.6 tok/s | — |
-| gemma-4-26b-a4b-it-4bit ⭐ | 4bit | ~15.5 GB | ~13.7 tok/s | **~42 tok/s** |
-| gemma-4-31b-it-4bit | 4bit | ~19 GB | ~1.6 tok/s | — |
+| gemma-4-e4b-it-4bit ⚡ | 4bit | ~5–7 GB | **1.75s** | Best for low-latency tasks |
+| gemma-4-26b-a4b-it-4bit ⭐ | 4bit | ~16–18 GB | 10.8s | Default service model, best quality |
+| gemma-4-31b-it-4bit | 4bit | ~19 GB | ~15s | Dense; slower, highest quality |
 
-⭐ = default / active service model
+⭐ = default service model &nbsp; ⚡ = recommended for fast/cheap tasks
+
+## Benchmark Results (mlx-vlm 0.4.4, 2026-04-04)
+
+> **Note:** mlx-vlm 0.4.4 fixed chunked prefill for Gemma 4's shared KV cache architecture,
+> delivering ~2x faster prompt processing at long context vs 0.4.3.
+
+| Task | E4B prompt | E4B gen | E4B time | 26B prompt | 26B gen | 26B time | E4B RAM | 26B RAM |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Short Q&A | 137/s | 67/s | ~0.4s | 80/s | 23/s | ~0.6s | 5.3 GB | 15.7 GB |
+| Reasoning | 172/s | 34/s | ~1.5s | 112/s | 35/s | ~1.0s | 5.3 GB | 15.7 GB |
+| Code Generation | 161/s | 34/s | ~3.0s | 102/s | 35/s | ~2.8s | 5.3 GB | 15.7 GB |
+| Medium Context (3K tok) | 544/s | 34/s | ~5s | 337/s | 33/s | ~10s | 6.1 GB | 16.9 GB |
+| Long Context (12K tok) | 516/s | 31/s | ~25s | 300/s | 29/s | ~43s | 6.8 GB | 18.0 GB |
+| Summarization | 259/s | 34/s | ~4s | 227/s | 35/s | ~4.3s | 6.8 GB | 18.0 GB |
+| Instruction Following | 202/s | 36/s | ~0.6s | 99/s | 39/s | ~0.6s | 6.8 GB | 18.0 GB |
+
+**Load times:** E4B = 1.75s &nbsp;|&nbsp; 26B = 10.8s
+
+**Key takeaways:**
+- E4B is 1.5–2× faster on prompt throughput and loads in under 2s — great for high-frequency calls
+- 26B has better reasoning depth and consistent generation quality
+- Long context (12K tokens): E4B prompts at 516 tok/s, 26B at 300 tok/s — both usable
+- Generation speed is nearly identical (~30–40 tok/s) on both — bottleneck is model size, not tokenization
+- Both stay under 18GB RAM, leaving headroom on a 32GB machine
+
+### Sample outputs (26B)
+
+**Reasoning** (bat-and-ball): _"The ball costs $0.05. If the ball costs x, then the bat costs x + $1, and x + (x + $1) = $1.10, so 2x = $0.10, x = $0.05."_
+
+**Instruction following**: `C++ / Java / Python / Rust / Swift` — alphabetical, no numbering, perfect.
+
+**Summarization** (meeting notes):
+- Performance Review: Q4 saw positive growth with DAU up 23%, revenue up 18%, churn down 4 points
+- Technical Debt: Auth system debt to be addressed over 3 weeks, delaying feature X by 2 weeks
+- Design Decision: Onboarding design B approved (34% better completion), assets due Wednesday
 
 ## Venv
 
 ```
-.venvs/gemma4-mlx/     # Python 3.11, mlx-vlm v0.4.3 + TurboQuant built-in
+.venvs/gemma4-mlx/     # Python 3.11, mlx-vlm v0.4.4 + TurboQuant built-in
 ```
+
+## Chat Template (required for instruction models)
+
+Always use `apply_chat_template` — raw prompts produce garbled output:
+
+```python
+from mlx_vlm import load, generate, apply_chat_template
+from mlx_vlm.utils import load_config
+
+model, processor = load("mlx-community/gemma-4-26b-a4b-it-4bit")
+config = load_config("mlx-community/gemma-4-26b-a4b-it-4bit")
+
+prompt = apply_chat_template(
+    processor, config,
+    prompt="What color is the sky?",
+    add_generation_prompt=True
+)
+result = generate(model, processor, prompt=prompt, max_tokens=50, verbose=True)
+print(result.text)
+```
+
+Gemma 4 turn format: `<bos><|turn>user\n{prompt}<turn|>\n<|turn>model\n`
 
 ## HTTP Service (launchd)
 
-The 26B MoE model runs as a persistent background service via launchd.
+The 26B MoE model runs as a persistent background service.
 
-**Service label:** `work.tomsalphaclawbot.gemma4-mlx`  
-**Plist:** `~/Library/LaunchAgents/work.tomsalphaclawbot.gemma4-mlx.plist`  
+**Service:** `work.tomsalphaclawbot.gemma4-mlx`  
 **Endpoint:** `http://127.0.0.1:8890/v1/chat/completions`  
 **Log:** `state/gemma4-server.log`
-
-Behavior:
-- Starts automatically on login (RunAtLoad)
-- KeepAlive — launchd restarts on crash (30s throttle)
-- Model takes ~30s to load after start before it accepts requests
-
-### launchd commands
 
 ```bash
 # Status
@@ -58,71 +107,27 @@ launchctl list work.tomsalphaclawbot.gemma4-mlx
 # Restart
 launchctl kickstart -k gui/$UID/work.tomsalphaclawbot.gemma4-mlx
 
-# Stop/unload (won't auto-restart until next login)
+# Stop
 launchctl bootout gui/$UID/work.tomsalphaclawbot.gemma4-mlx
-
-# Re-load after bootout
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/work.tomsalphaclawbot.gemma4-mlx.plist
 ```
 
-### Helper script
-
-`scripts/gemma4-server.sh` also works for start/stop/status (manages the launchd-owned process or runs standalone):
-
+Helper script:
 ```bash
-bash scripts/gemma4-server.sh            # start (or check if already running)
-bash scripts/gemma4-server.sh --status   # status
-bash scripts/gemma4-server.sh --stop     # stop
-bash scripts/gemma4-server.sh --fg       # run in foreground (for debugging)
+bash projects/gemma4-local/gemma4-server.sh            # start
+bash projects/gemma4-local/gemma4-server.sh --status   # status
+bash projects/gemma4-local/gemma4-server.sh --stop     # stop
 ```
 
 ## OpenClaw Integration
 
-**Provider entry** in `~/.openclaw/openclaw.json`:
-```json
-"gemma4-mlx": {
-  "baseUrl": "http://127.0.0.1:8890/v1",
-  "apiKey": "none",
-  "api": "openai-responses",
-  "models": [...]
-}
-```
+**Provider** in `~/.openclaw/openclaw.json`: `gemma4-mlx`  
+**Alias:** `gemma4` — use `/model gemma4` to switch  
+**Fallback chain:** `claude-opus-4-6 → gpt-5.3-codex → claude-sonnet-4-6 → gemma4`
 
-**Fallback chain** (agents.defaults.model.fallbacks):
-```
-anthropic/claude-opus-4-6
-  → openai-codex/gpt-5.3-codex
-  → anthropic/claude-sonnet-4-6
-  → gemma4-mlx/mlx-community/gemma-4-26b-a4b-it-4bit  ← last resort local
-```
-
-**Alias:** `gemma4` — switch to it directly with `/model gemma4`
-
-**Important:** Always use the full model ID in API requests:
+Always use the full model ID in API requests:
 ```
 "model": "mlx-community/gemma-4-26b-a4b-it-4bit"
 ```
-
-## Hermes Integration (Fallback)
-
-Hermes is configured to fail over to this same local Gemma 4 endpoint when its primary model provider fails.
-
-`~/.hermes/config.yaml`:
-
-```yaml
-fallback_model:
-  provider: custom
-  model: mlx-community/gemma-4-26b-a4b-it-4bit
-  base_url: http://127.0.0.1:8890/v1
-  api_key_env: OPENAI_API_KEY
-```
-
-Notes:
-- Hermes primary can stay cloud (e.g. `openai-codex/gpt-5.3-codex`)
-- On provider failure, Hermes switches to local Gemma 4 and continues the turn
-- Full model ID is required in requests (`mlx-community/gemma-4-26b-a4b-it-4bit`)
-
-## Testing
 
 ```bash
 curl http://127.0.0.1:8890/v1/chat/completions \
@@ -136,63 +141,52 @@ curl http://127.0.0.1:8890/v1/chat/completions \
 
 ## TurboQuant KV Compression
 
-mlx-vlm v0.4.3 includes TurboQuant natively (PR #858, #894). The server runs with `--kv-bits 3 --kv-quant-scheme turboquant`.
+mlx-vlm 0.4.4 includes TurboQuant natively. Server runs with `--kv-bits 3 --kv-quant-scheme turboquant`.
 
-- KV-3: 4.6x compression, +1.06% PPL degradation
-- At 128K context on 31B: KV memory 13.3 GB → 4.9 GB (-63%)
-- Quality preserved at typical conversation lengths
+| Mode | Compression | PPL impact | Notes |
+|---|---|---|---|
+| turbo2 | 6.4× | +6.48% PPL | Aggressive |
+| turbo3 | 4.6× | +1.06% PPL | **Default — sweet spot** |
+| turbo4 | 3.8× | +0.23% PPL | Conservative |
+
+At 128K context on 31B: KV memory 13.3 GB → 4.9 GB (-63%), quality preserved.
+
+## HuggingFace Auth
+
+Required for model downloads. Token in Bitwarden under `huggingface.co` → field `token`.
+
+```bash
+# Set for session
+export HF_TOKEN=$(rbw get huggingface.co --field token)
+```
+
+Saved persistently to `~/.cache/huggingface/token` and `projects/gemma4-local/.env`.
+
+## Benchmarking
+
+```bash
+HF_TOKEN=$(rbw get huggingface.co --field token) \
+  .venvs/gemma4-mlx/bin/python3.11 projects/gemma4-local/benchmark.py
+```
+
+Results saved to `projects/gemma4-local/benchmark_results.json`.
 
 ## Gemma 4 Architecture Notes
 
 - Released: April 2, 2026 by Google DeepMind (Apache 2.0)
 - 26B-A4B: Mixture of Experts — only 4B params active per token
-- 256K context window, multimodal (text + image)
+- 256K context window, multimodal (text + image + audio)
 - Per-Layer Embeddings (PLE), Shared KV Cache, alternating attention
-- Thinks via `<|channel>thought</channel>` (activated automatically)
-- LMArena: 26B MoE = 1441, 31B dense = 1452
+- Thinking mode via `<|channel>thought</channel>` (automatic)
+- LMArena: 26B MoE = 1441 (#6 open), 31B dense = 1452 (#3 open)
 
-## Credits & Upstream Resources
+## Credits
 
-This project is glue code on top of excellent upstream work:
-
-| Project | What it does | Link |
-|---|---|---|
-| **Gemma 4** | The model family — 26B MoE, Apache 2.0 | [Google DeepMind](https://deepmind.google/models/gemma/gemma-4/) · [HuggingFace](https://huggingface.co/google/gemma-4-27b-it) |
-| **MLX** | Apple Silicon ML framework powering inference | [github.com/ml-explore/mlx](https://github.com/ml-explore/mlx) |
-| **mlx-vlm** | VLM inference + server on MLX; includes TurboQuant natively (v0.4.3+) | [github.com/Blaizzy/mlx-vlm](https://github.com/Blaizzy/mlx-vlm) |
-| **TurboQuant+** | KV cache compression via PolarQuant + Walsh-Hadamard rotation (4.6–6.4x) | [github.com/TheTom/turboquant_plus](https://github.com/TheTom/turboquant_plus) |
-| **mlx-community** | Pre-quantized MLX model weights on HuggingFace | [huggingface.co/mlx-community](https://huggingface.co/mlx-community) |
-| **OpenClaw** | AI agent runtime this service integrates into | [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw) |
-
-### Key people
-
-- **Blaizzy** ([@prince_canuma](https://x.com/prince_canuma)) — mlx-vlm maintainer, shipped day-0 Gemma 4 support and native TurboQuant integration
-- **Tom Turney** ([@no_stp_on_snek](https://x.com/no_stp_on_snek)) — TurboQuant+ author, KV cache + weight compression for local inference
-- **Google DeepMind** — Gemma 4 model release (Apache 2.0)
-- **Apple MLX team** — MLX framework making this feasible on Apple Silicon
-
----
-
-## Running Other Models (CLI)
-
-For one-off inference with any downloaded model:
-
-```bash
-cd /Users/openclaw/.openclaw/workspace
-source .venvs/gemma4-mlx/bin/activate
-
-# 26B MoE
-python -m mlx_vlm.generate \
-  --model mlx-community/gemma-4-26b-a4b-it-4bit \
-  --max-tokens 200 --prompt "Your prompt here"
-
-# E4B (fast, 8GB)
-python -m mlx_vlm.generate \
-  --model mlx-community/gemma-4-e4b-it-8bit \
-  --max-tokens 200 --prompt "Your prompt here"
-
-# With image
-python -m mlx_vlm.generate \
-  --model mlx-community/gemma-4-26b-a4b-it-4bit \
-  --prompt "Describe this image" --image /path/to/image.jpg
-```
+| Project | Link |
+|---|---|
+| **Gemma 4** (Google DeepMind) | [deepmind.google/models/gemma](https://deepmind.google/models/gemma/gemma-4/) |
+| **MLX** (Apple) | [github.com/ml-explore/mlx](https://github.com/ml-explore/mlx) |
+| **mlx-vlm** (Blaizzy / [@prince_canuma](https://x.com/prince_canuma)) | [github.com/Blaizzy/mlx-vlm](https://github.com/Blaizzy/mlx-vlm) |
+| **TurboQuant+** ([@no_stp_on_snek](https://x.com/no_stp_on_snek)) | [github.com/TheTom/turboquant_plus](https://github.com/TheTom/turboquant_plus) |
+| **mlx-community** (HuggingFace) | [huggingface.co/mlx-community](https://huggingface.co/mlx-community) |
+| **OpenClaw** | [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw) |
