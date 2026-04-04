@@ -20,8 +20,33 @@ HOST="127.0.0.1"
 PID_FILE="$PROJECT_DIR/state/gemma4-server.pid"
 LOG_FILE="$PROJECT_DIR/state/gemma4-server.log"
 
+# MLX wired memory cap in MB — limits GPU wired memory so Docker and other
+# services can coexist on 32GB. 20480 = 20GB for MLX, ~12GB for everything else.
+# Requires: sudo sysctl iogpu.wired_limit_mb=20480 (or set in /etc/sysctl.conf)
+MLX_WIRED_LIMIT_MB=${MLX_WIRED_LIMIT_MB:-20480}
+
+# Minimum free RAM (GB) required before starting
+MIN_FREE_GB=${MIN_FREE_GB:-6}
+
 # Ensure state dir exists
 mkdir -p "$PROJECT_DIR/state"
+
+# --- Preflight: check available RAM ---
+check_ram() {
+  AVAIL_GB=$(python3 -c "
+import subprocess, re
+out = subprocess.check_output(['vm_stat']).decode()
+page = 16384
+free = int(re.search(r'Pages free:\\s+(\\d+)', out).group(1))
+inactive = int(re.search(r'Pages inactive:\\s+(\\d+)', out).group(1))
+print(f'{(free+inactive)*page/1e9:.1f}')
+")
+  echo "Available RAM: ${AVAIL_GB} GB (minimum required: ${MIN_FREE_GB} GB)"
+  python3 -c "exit(0 if float('${AVAIL_GB}') >= ${MIN_FREE_GB} else 1)" || {
+    echo "ERROR: Not enough free RAM to start safely. Free up memory first."
+    exit 1
+  }
+}
 
 case "${1:-}" in
   --status)
@@ -62,6 +87,7 @@ case "${1:-}" in
     ;;
 
   --fg)
+    check_ram
     echo "Starting Gemma 4 26B MoE server in foreground on http://$HOST:$PORT ..."
     exec "$VENV/bin/python" -m mlx_vlm server \
       --model "$MODEL" \
@@ -83,11 +109,22 @@ case "${1:-}" in
       fi
     fi
 
+    check_ram
     echo "Starting Gemma 4 26B MoE server in background..."
     echo "  Model: $MODEL"
     echo "  Endpoint: http://$HOST:$PORT/v1/chat/completions"
     echo "  Log: $LOG_FILE"
     echo "  TurboQuant KV-3 compression enabled"
+    echo "  MLX wired memory cap: ${MLX_WIRED_LIMIT_MB} MB"
+
+    # Set MLX wired memory limit before starting (requires iogpu.wired_limit_mb sysctl)
+    "$VENV/bin/python" -c "
+import mlx.core as mx
+if mx.metal.is_available():
+    limit = ${MLX_WIRED_LIMIT_MB} * 1024 * 1024
+    mx.set_wired_limit(limit)
+    print(f'MLX wired limit set to ${MLX_WIRED_LIMIT_MB} MB')
+" 2>/dev/null || true
 
     nohup "$VENV/bin/python" -m mlx_vlm server \
       --model "$MODEL" \

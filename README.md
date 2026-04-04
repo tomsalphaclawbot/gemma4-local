@@ -193,24 +193,24 @@ Results saved to `projects/gemma4-local/benchmark_results.json`.
 - Thinking mode via `<|channel>thought</channel>` (automatic)
 - LMArena: 26B MoE = 1441 (#6 open), 31B dense = 1452 (#3 open)
 
-## ⚠️ Docker + MLX: Don't Run Both on 32GB
+## Running Alongside Docker (32GB)
 
-Running large MLX inference jobs while Docker Desktop is active will crash the machine.
+MLX and Docker Desktop can coexist on 32GB, but you **must** set a system-level GPU memory cap first — otherwise MLX will claim the full recommended 22.9 GB and Docker's VM will destabilize under memory pressure.
 
-**What happens:** MLX fills all 32GB of unified memory. macOS starts swapping aggressively. Docker's VM process triggers the macOS disk write watchdog (~2.1 GB dirtied in under 60 seconds). The OS kills Docker's VM, the machine hard-resets.
-
-**Confirmed empirically** on this hardware (Mac16,13, 32GB) with the 26B model. Diagnostic logs: `ResetCounter-*.diag` + `com.apple.Virtualization.VirtualMachine_*.diag` in `/Library/Logs/DiagnosticReports/`.
-
-**Safe pattern:**
+**One-time setup (requires sudo):**
 ```bash
-# Before running any MLX inference:
-vm_stat | python3 -c "import sys,re; l=sys.stdin.read(); p=16384; free=(int(re.search(r'Pages free:\s+(\d+)',l).group(1))+int(re.search(r'Pages inactive:\s+(\d+)',l).group(1)))*p/1e9; print(f'Available: {free:.1f} GB'); exit(0 if free > 12 else 1)"
+# Cap MLX GPU wired memory at 20GB, leaving ~12GB for Docker + OS
+sudo sysctl iogpu.wired_limit_mb=20480
 
-# If Docker needs to be running: stop the Gemma server first
-bash gemma4-server.sh --stop
+# Persist across reboots
+echo 'iogpu.wired_limit_mb=20480' | sudo tee -a /etc/sysctl.conf
 ```
 
-Minimum safe headroom before loading the 26B model: **12 GB free**.
+The `gemma4-server.sh` script also calls `mx.set_wired_limit(20480 MB)` at startup as an application-level guard. Both layers together prevent the crash.
+
+**What happens without the cap:** MLX wires up to 22.9 GB (Apple's `max_recommended_working_set_size`). macOS swaps aggressively. Docker's VM triggers the disk write watchdog (~2.1 GB dirtied in 40-60s). Hard reset. This was confirmed empirically — diagnostic logs: `ResetCounter-*.diag` in `/Library/Logs/DiagnosticReports/`.
+
+**Tuning:** default cap is 20480 MB. To adjust: `MLX_WIRED_LIMIT_MB=18432 bash gemma4-server.sh`
 
 ---
 
