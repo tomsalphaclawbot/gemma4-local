@@ -34,6 +34,7 @@ QUEUE_TIMEOUT_S = int(os.environ.get("GEMMA_QUEUE_TIMEOUT", "120"))
 
 # Minimum free RAM (GB) required to accept a new request
 MIN_FREE_RAM_GB = float(os.environ.get("GEMMA_MIN_FREE_RAM_GB", "4.0"))
+BACKEND_TIMEOUT_S = int(os.environ.get("GEMMA_BACKEND_TIMEOUT", "300"))
 
 # Serialization lock — the whole point of this proxy
 _inference_lock = threading.Lock()
@@ -82,13 +83,115 @@ class GemmaProxyHandler(http.server.BaseHTTPRequestHandler):
         ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         sys.stderr.write(f"[{ts}] {format % args}\n")
 
+    def _normalize_responses_payload(self, body):
+        """
+        MLX /v1/responses rejects some item types (e.g. `output_text`) that
+        OpenClaw can include when replaying prior model outputs.
+        Convert those to equivalent input text items before forwarding.
+        """
+        if not body:
+            return body
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except Exception:
+            return body
+
+        changed = False
+
+        def normalize_content_item(item):
+            nonlocal changed
+            if not isinstance(item, dict):
+                return item
+            item_type = item.get("type")
+            if item_type == "output_text":
+                changed = True
+                text = item.get("text")
+                if text is None:
+                    text = item.get("content", "")
+                return {"type": "input_text", "text": text}
+            return item
+
+        def normalize_input_item(item):
+            nonlocal changed
+            if not isinstance(item, dict):
+                return item
+            if item.get("type") == "output_text":
+                changed = True
+                text = item.get("text")
+                if text is None:
+                    text = item.get("content", "")
+                return {"type": "input_text", "text": text}
+            content = item.get("content")
+            if isinstance(content, list):
+                item = dict(item)
+                item["content"] = [normalize_content_item(c) for c in content]
+            return item
+
+        def content_text(value):
+            if isinstance(value, str):
+                return value
+            if isinstance(value, list):
+                parts = []
+                for item in value:
+                    if isinstance(item, dict):
+                        text = item.get("text")
+                        if text is None and isinstance(item.get("content"), str):
+                            text = item.get("content")
+                        if text is not None:
+                            parts.append(str(text))
+                    elif item is not None:
+                        parts.append(str(item))
+                return "\n".join(parts)
+            return ""
+
+        def collapse_typed_input_to_messages(items):
+            parts = []
+            for item in items:
+                if not isinstance(item, dict):
+                    if item is not None:
+                        parts.append(str(item))
+                    continue
+                text = item.get("text")
+                if text is None:
+                    text = item.get("content")
+                if isinstance(text, list):
+                    text = content_text(text)
+                if text is not None:
+                    parts.append(str(text))
+            return [{"role": "user", "content": "\n".join(p for p in parts if p)}]
+
+        input_value = payload.get("input")
+        if isinstance(input_value, list):
+            normalized_items = [normalize_input_item(i) for i in input_value]
+            # MLX responses expects input as either plain string or list of
+            # chat messages with role/content; typed item arrays can 422.
+            if any(isinstance(i, dict) and "type" in i and "role" not in i for i in normalized_items):
+                changed = True
+                payload["input"] = collapse_typed_input_to_messages(normalized_items)
+            else:
+                payload["input"] = normalized_items
+        elif isinstance(input_value, dict):
+            normalized_item = normalize_input_item(input_value)
+            if isinstance(normalized_item, dict) and "type" in normalized_item and "role" not in normalized_item:
+                changed = True
+                text = normalized_item.get("text")
+                if text is None:
+                    text = content_text(normalized_item.get("content"))
+                payload["input"] = [{"role": "user", "content": str(text or "")}]
+            else:
+                payload["input"] = normalized_item
+
+        if not changed:
+            return body
+        return json.dumps(payload).encode("utf-8")
+
     def _proxy_passthrough(self, method="GET", body=None):
         """Forward non-inference requests directly (no lock needed)."""
         url = f"{MLX_BASE}{self.path}"
         headers = {"Content-Type": self.headers.get("Content-Type", "application/json")}
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
-            resp = urllib.request.urlopen(req, timeout=30)
+            resp = urllib.request.urlopen(req, timeout=BACKEND_TIMEOUT_S)
             data = resp.read()
             self.send_response(resp.status)
             self.send_header("Content-Type", resp.headers.get("Content-Type", "application/json"))
@@ -145,7 +248,10 @@ class GemmaProxyHandler(http.server.BaseHTTPRequestHandler):
         body = self.rfile.read(content_length) if content_length > 0 else b""
 
         # Non-inference POST endpoints: passthrough
-        if "/chat/completions" not in self.path and "/completions" not in self.path:
+        is_inference = any(
+            segment in self.path for segment in ("/chat/completions", "/completions", "/responses")
+        )
+        if not is_inference:
             self._proxy_passthrough("POST", body)
             return
 
@@ -194,6 +300,9 @@ class GemmaProxyHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self.log_message("FORWARD: no queue contention")
 
+            if "/responses" in self.path:
+                body = self._normalize_responses_payload(body)
+
             # Forward to MLX
             url = f"{MLX_BASE}{self.path}"
             headers = {
@@ -201,7 +310,7 @@ class GemmaProxyHandler(http.server.BaseHTTPRequestHandler):
             }
             req = urllib.request.Request(url, data=body, headers=headers, method="POST")
             try:
-                resp = urllib.request.urlopen(req, timeout=300)  # 5 min max per inference
+                resp = urllib.request.urlopen(req, timeout=BACKEND_TIMEOUT_S)
                 data = resp.read()
                 self.send_response(resp.status)
                 self.send_header("Content-Type", resp.headers.get("Content-Type", "application/json"))
